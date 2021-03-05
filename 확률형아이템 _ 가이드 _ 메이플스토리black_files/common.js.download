@@ -1,0 +1,1011 @@
+﻿
+var LOGIN = (function () {
+    var instance;
+    var _submitting = false;
+
+    function initiate() {
+        //public
+        return {
+            loginEmail: function () {
+                var emailID = $('#eid').val();
+                var password = $('#epw').val();
+                if (emailID === '') {
+                    alert('이메일 아이디를 입력하세요.');
+                    return;
+                }
+                if (password === '') {
+                    alert('암호를 입력하세요.');
+                    return;
+                }
+                if (checkIDValidation($('#eid').get(0))) {
+
+                    //localstorage 아이디 저장 처리
+                    LOGIN.saveIDManagement('e');
+
+                    NgbLogin.Login(NgbString.Trim(emailID), NgbString.Trim(password));
+                }
+            },
+            loginMaple: function () {
+                var id = $('#mid').val();
+                var password = $('#mpw').val();
+                if (id === '') {
+                    alert('메이플 아이디를 입력하세요.');
+                    return;
+                }
+                if (password === '') {
+                    alert('암호를 입력하세요.');
+                    return;
+                }
+
+                //localstorage 아이디 저장 처리
+                LOGIN.saveIDManagement('m');
+
+                $('#frmLoginMaple').submit();
+            },
+            storageAvailable: function (t) {
+                try {
+                    var storage = window[t],
+                        x = '__storage_test__';
+                    storage.setItem(x, x);
+                    storage.removeItem(x);
+                    return true;
+                }
+                catch (e) {
+                    return e instanceof DOMException && (
+                        // Firefox를 제외한 모든 브라우저
+                        e.code === 22 ||
+                        // Firefox
+                        e.code === 1014 ||
+                        // 코드가 존재하지 않을 수도 있기 때문에 테스트 이름 필드도 있습니다.
+                        // Firefox를 제외한 모든 브라우저
+                        e.name === 'QuotaExceededError' ||
+                        // Firefox
+                        e.name === 'NS_ERROR_DOM_QUOTA_REACHED') &&
+                        // 이미 저장된 것이있는 경우에만 QuotaExceededError를 확인하십시오.
+                        storage.length !== 0;
+                }
+            },
+            displayIDManagement: function () {
+                if (LOGIN.storageAvailable('localStorage')) {
+                    //localStorage 사용가능
+                    var s = [
+                        { target: '#eid', id: window.localStorage.getItem("estoid") },
+                        { target: '#mid', id: window.localStorage.getItem("mstoid") }
+                    ];
+
+                    for (var i = 0; i < s.length; i++) {
+                        if (s[i].id == undefined || s[i].id == null || s[i].id == "") $(s[i].target).parent().find('span').removeClass("active");
+                        else $(s[i].target).val(s[i].id).parent().find('span').addClass("active");
+                    }
+                }
+                else {
+                    //localStorage 사용불가
+                    $(".id_input span").remove();
+                    $(".id_input input[type=text]").css("width", "96% !important");
+                }
+            },
+            saveIDManagement: function (t) {
+                if (LOGIN.storageAvailable('localStorage')) {
+                    //localStorage 사용가능
+                    var i = $('#' + t + 'id').val();
+                    var cl = $('#' + t + 'id').parent().find('span').attr("class");
+
+                    if (cl == "active") window.localStorage.setItem(t + "stoid", i);
+                    else window.localStorage.removeItem(t + "stoid", i);
+                }
+            },
+            changeID: function () {
+
+                var id = $('.sel_login_id input:radio[name=login_id_sel]:checked').val();
+                var master = $('.bnarea input:checkbox[name=chkMaster]').is(":checked") ? 1 : 0;
+                if (!id || id === '') {
+                    alert('로그인할 메이플ID를 선택하세요.');
+                    return;
+                }
+                var form =
+                    $('<form method="post" action="/Authentication/Email/ChangeID"></form>')
+                        .append('<input type="hidden" name="id" value="' + id + '"/>')
+                        .append('<input type="hidden" name="master" value="' + master + '"/>')
+                        .append('<input type="hidden" name="redirectTo" value="' + location.href + '"/>').appendTo('body').submit();
+            },
+            getIDList: function () {
+                var token = $('input[name="__RequestVerificationToken"]').val();
+                
+                $.ajax({
+                    url: '/Authentication/Email/IDList',
+                    type: 'post',
+                    data: {__RequestVerificationToken: token},
+                    success: function (data) {
+                        $('.sel_login_id').html(data);
+                        open_login_pop();
+                        //if (data.code == 0) {
+                        //    $('.sel_login_id').html(data.value);
+                        //    open_login_pop();
+                        //}
+                        //else {
+                        //    alert(data.message);
+                        //}
+                    },
+                    error: function (a, b) {
+                        alert('error!');
+                    }
+                });
+            },
+            integrateID: function (obj) {
+                //obj.preventDefault();
+                if (!COMMON.isParentMembershipLogin) {
+                    alert('넥슨 로그인이 필요합니다.');
+                    return;
+                }
+                //var url = $(obj).attr('href');
+                var url = '/Account/Membership/Integration';
+                var popup = window.open(url, 'authPopup', 'width=700, height=410, resizable=0, scrollbars=no, status=0, titlebar=0, toolbar=0');
+                if (popup === null) {
+                    alert('팝업을 허용해주세요');
+                    return;
+                }
+            }
+        };
+    }
+
+    //private
+    function checkIDValidation(userInputElement) {
+
+        var userInput = userInputElement.value;
+
+        var strKr = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/;
+        var arrEmailID = userInput.split('@');
+        var regExpEmail = /^[-A-Za-z0-9_]+[-A-Za-z0-9_.]*[@]{1}[-A-Za-z0-9_]+[-A-Za-z0-9_.]*[.]{1}[A-Za-z]{2,5}$/;
+        var regExpNumber = /[^0-9]/gi;
+
+        //이메일 ID, 체험 ID 공통사항
+        if (strKr.test(userInput)) {
+            alert('한글은 입력하실 수 없습니다.');
+            userInputElement.focus();
+            return false;
+        }
+
+        if (userInput.indexOf('@') === -1) {
+            alert('유효한 이메일 주소 혹은 체험 ID가 아닙니다.');
+            userInputElement.focus();
+            return false;
+        }
+
+        //체험 ID
+        if (arrEmailID[1] === 'guest') {
+
+            if (regExpNumber.test(arrEmailID[0]) || arrEmailID[0].length < 10) {
+                alert('유효한 체험 ID가 아닙니다.');
+                userInputElement.focus();
+                return false;
+            }
+
+        } else { //이메일 ID
+
+            if ((userInput.search(regExpEmail)) === -1) {
+                alert('유효한 이메일 주소가 아닙니다.');
+                userInputElement.focus();
+                return false;
+            }
+
+            if (arrEmailID[0].length < 3) {
+                alert('입력하신 이메일 주소를 확인해주세요.');
+                userInputElement.focus();
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if (!instance) instance = initiate();
+    return instance;
+}());
+
+var PLATFORM = (function () {
+    var instance;
+    var _isOpeningCashCharge = false;
+    var _launchDate = null;
+
+    function initiate() {
+        //public
+        return {
+            LaunchGame: function (WID) {
+
+                var now = new Date();
+                try {
+                    ga('send', {
+                        hitType: 'event',
+                        eventCategory: '게임시작',
+                        eventAction: '버튼클릭',
+                        eventLabel: '전체페이지'
+                    });
+                }catch(e){
+                    //
+                }
+
+                UTILITY.submitAsync2({
+                    submitTo: '/authentication/swk?h=',
+                    method: 'post',
+                    validation: function () {
+                        if (_launchDate !== null && now.getTime() - _launchDate < (1 * 60 * 1000)) {
+                            alert('게임을 실행 중입니다. 잠시 후 다시 시도하여 주세요.');
+                            return false;
+                        }
+                        else {
+                            _launchDate = now.getTime();
+                            return true;
+                        }
+                    },
+                    callback: function (data) {
+                        if (data.Code === 0 || data.Code === 1) {
+                            if (COMMON.site === 'naver') {
+                                NGM.MxChannelLaunchGame('589825', 'WebStart', WID, '6', '');
+                            }   
+                            else {
+                                PS.game.startGame({ gameCode: 589825, param: ["WebStart", WID] });
+                                $h.a2s.sendClickLog('GAME_START', null);
+                            }
+                                
+                            //if (COMMON.site === 'naver')
+                            //    NGM.MxChannelLaunchGame('589825', 'sn ' + COMMON.oid, WID, '6', '');
+                            //else
+                            //    PS.game.startGame({ gameCode: 589825, param: ['sn ' + COMMON.oid, WID] });
+
+                            //$h.a2s.sendClickLog('GAME_START', null);
+                            //uploadFBOfflineEvents();
+                        }
+                        else if (data.Code === 5)
+                            alert('세션이 만료되었습니다. 다시 로그인 후 시도해 주세요.');
+                        else
+                            alert('인증키 생성에 실패하였습니다.');
+                    },
+                    useCache: false
+                });
+            },
+            openCashCharge: function () {
+
+                if (_isOpeningCashCharge) {
+                    alert('넥슨캐시 충전창을 여는 중입니다. 잠시만 기다려 주세요.');
+                    return false;
+                }
+
+                _isOpeningCashCharge = true;
+
+                $.ajax({
+                    url: '/Common/Cash/Charge',
+                    async: false,
+                    cache: false,
+                    dataType: 'json',
+                    success: function (data) {
+                        _isOpeningCashCharge = false;
+
+                        if (data.code === 0) {
+                            var popcash = window.open(data.url, data.name, 'width=' + data.width + ',height=' + data.height);
+                            if (popcash === null) {
+                                alert('팝업을 허용해주세요');
+                            }
+                        }
+                        else if (data.code === 8) {
+                            alert(data.message);
+                            if (typeof goReAuthorize === 'function') {
+                                goReAuthorize(589824);      //약관 재동의
+                            }
+                        }
+                        else {
+                            alert(data.message);
+                        }
+                    },
+                    error: function (a, b, c) {
+                        _isOpeningCashCharge = false;
+                        alert('넥슨캐시 충전창을 여는 중 오류가 발생하였습니다.');
+                    }
+                });
+                _isOpeningCashCharge = false;
+            }
+        };
+    }
+
+    if (!instance) instance = initiate();
+    return instance;
+}());
+
+
+var TestWorld = (function () {
+    var instance;
+    var _isOpeningCashCharge = false;
+    var _launchDate = null;
+
+    function initiate() {
+        //public
+        return {
+            LaunchGame: function (WID) {
+
+                //alert('일시적인 오류가 발생하였습니다.\nGameLauncherT.exe를 실행해 주세요.');
+                //return;
+
+                try {
+                    ga('send', {
+                        hitType: 'event',
+                        eventCategory: '게임시작',
+                        eventAction: '버튼클릭',
+                        eventLabel: '전체페이지'
+                    });
+                } catch (e) {
+                    //
+                }
+
+                var now = new Date();
+                var password = $('.test_wrold_side input[name=mpw]').val();
+                if (!COMMON.isMembership) {
+                    if (password === '') {
+                        alert('[테스트월드 START] 버튼 위에,\n테스트월드 비밀번호를 입력해주세요.');
+                        return;
+                    }
+                }
+
+                UTILITY.submitAsync2({
+                    submitTo: '/authentication/swkt?h=',
+                    method: 'post',
+                    data: { Password: password },
+                    validation: function () {
+                        if (_launchDate !== null && now.getTime() - _launchDate < (1 * 60 * 1000)) {
+                            alert('게임을 실행 중입니다. 잠시 후 다시 시도하여 주세요.');
+                            return false;
+                        }
+                        else {
+                            _launchDate = now.getTime();
+                            return true;
+                        }
+                    },
+                    callback: function (data) {
+                        if (data.Code === 0 || data.Code === 1) {
+                            if (COMMON.site === 'naver')
+                                TestWorld.NGM_MxChannelLaunchGame('589826', 'WebStart', WID, '6', '');
+                            else
+                                TestWorld.NGM_MxLaunchGame('589826', 'WebStart', WID);
+                        }
+                        else if (data.Code === 5)
+                            alert('세션이 만료되었습니다. 다시 로그인 후 시도해 주세요.');
+                        else {
+                            _launchDate = null;
+                            //alert('인증키 생성에 실패하였습니다.');
+                            alert(data.Message);
+                        }
+                    },
+                    useCache: false
+                });
+            },
+            NGM_MxLaunchGame: function (game, arg1, arg2, position, architecturePlatform) {
+
+                var msenc = NGM.GetCookie("MSGENCT");
+                var launchtype = String(arg1).toLowerCase();
+                var lastworld = String(arg2).toLowerCase();
+
+                if (lastworld != null && lastworld != "" && lastworld != "undefined") {
+                    msenc = msenc + ":" + arg2;
+                }
+                if (launchtype == "gameluanching") {
+                    msenc = "";
+                }
+
+                NGM.GxLaunchGame(game, arg1, msenc, null, position, null, architecturePlatform);
+            },
+            NGM_MxChannelLaunchGame: function (game, arg1, arg2, service, position, architecturePlatform) {
+
+                var msenc = NGM.GetCookie("MSGENCT");
+                var launchtype = String(arg1).toLowerCase();
+                var lastworld = String(arg2).toLowerCase();
+
+                if (lastworld != null && lastworld != "" && lastworld != "undefined") {
+                    msenc = msenc + ":" + arg2;
+                }
+                if (launchtype == "gameluanching") {
+                    msenc = "";
+                }
+
+                NGM.GxLaunchGame(game, arg1, msenc, null, position, service, architecturePlatform);
+            }
+        };
+    }
+
+    if (!instance) instance = initiate();
+    return instance;
+}());
+
+var UTILITY = (function () {
+    var instance;
+    var _submitting = false;
+
+    function initiate() {
+        //public
+        return {
+            submitSync: function (url, data, idx) {
+
+                UTILITY.submitSyncTarget(url, data, idx);
+            },
+            submitSyncTarget: function (url, data, idx, target) {
+
+                var id = (idx) ? '__frm' + idx : '__frm0';
+                var form;
+                if ($('#' + id).length > 0) {
+                    form = $('#' + id);
+                    form.attr('action', url);
+                }
+                else {
+                    form = (target) ? $('<form id="' + id + '" method="post" action="' + url + '" target="' + target + '"></form>')
+                        : $('<form id="' + id + '" method="post" action="' + url + '"></form>');
+                    $.each(data, function (key, value) {
+                        form.append('<input type="hidden" name="' + key + '" value="' + value + '"/>');
+                    });
+                    form.appendTo('body');
+                }
+
+                form.submit();
+            },
+            submitAsync2: function (param) {
+                var submitTo = (param.submitTo) ? param.submitTo : window.location.pathname;
+                var method = (param.method) ? param.method : 'get';
+                var data = (param.data) ? param.data : {};
+                var validation = (param.validation) ? param.validation : function () { return true; };
+                var callback = (param.callback) ? param.callback : function () { };
+                var useCache = (param.useCache !== undefined) ? param.useCache : true;
+
+                if (method.toLowerCase() !== 'get' && method.toLowerCase() !== 'post' && method.toLowerCase() !== 'put' && method.toLowerCase() !== 'delete') {
+                    alert('부적절한 method.');
+                    return;
+                }
+                if (_submitting) {
+                    alert('처리중입니다.');
+                    return;
+                }
+                _submitting = true;
+
+                if (validation) {
+                    if (!validation()) {
+                        _submitting = false;
+                        return;
+                    }
+                }
+
+                $.ajax({
+                    type: method,
+                    url: submitTo,
+                    async: false,
+                    cache: useCache,
+                    data: data,
+                    success: function (data) {
+                        _submitting = false;
+                        callback(data);
+                    },
+                    error: function (a, b) {
+                        _submitting = false;
+                        alert(b);
+                    }
+                });
+            },
+            checkStringBytes: function (s, l) {
+                return UTILITY.getStringBytes(s) <= l;
+            },
+            getStringBytes: function (s, b, i, c) {
+                s = s.replace(/\n/gi, '\r\n');
+                for (b = i = 0; c = s.charCodeAt(i++); b += c >> 11 ? 3 : c >> 7 ? 2 : 1);
+                return b;
+            },
+            onKeyDown: function (obj, callback, key) {
+                if (window.event.keyCode === key) {
+                    (callback)(obj);
+                }
+            },
+            onEnterKeyDown: function (obj, callback) {
+                this.onKeyDown(obj, callback, 13);
+            },
+            parseQueryString: function () {
+                var params = {};
+                window.location.search.replace(/[?&]+([^=&]+)=([^&]*)/gi, function (str, key, value) { params[key] = value; });
+                return params;
+            },
+            openVirtualKeyPad: function (objID) {
+                var winWidth = 564;
+                var winHeight = 375;
+                var win = null;
+                var elementInfo = document.getElementById(objID).getBoundingClientRect();
+                var winl = (screenLeft + elementInfo.right);
+                var wint = (screenTop + elementInfo.top);
+                var settings = 'height=' + winHeight + ',';
+                settings += 'width=' + winWidth + ',';
+                settings += 'top=' + wint + ',';
+                settings += 'left=' + winl + ',';
+                settings += 'resizable=no';
+                win = window.open("/Common/VirtualKeyPad?objID=" + objID + "&domain=" + document.domain, "MouseKeyPad", settings);
+                win.window.focus();
+            },
+            getDomainWithProtocol: function () {
+                //return window.location.href.replace(window.location.search, '').replace(window.location.pathname, '').replace(window.location.hash, '');
+                return window.location.protocol + '//' + window.location.hostname;
+            },
+            generateDaumPostcode: function () {
+
+                // 해당페이지 js 추가필요
+                //<script type = "text/javascript" src = "https://maplestory.nexon.com/js/web/jquery1.9.1.min.js" ></script>
+                //<script type="text/javascript" src="https://ssl.daumcdn.net/dmaps/map_js_init/postcode.v2.js"></script>
+
+                new daum.Postcode({
+                    oncomplete: function (data) {
+                        // 팝업에서 검색결과 항목을 클릭했을때 실행할 코드를 작성하는 부분.
+
+                        // 각 주소의 노출 규칙에 따라 주소를 조합한다.
+                        // 내려오는 변수가 값이 없는 경우엔 공백('')값을 가지므로, 이를 참고하여 분기 한다.
+                        var fullAddr = ''; // 최종 주소 변수
+                        var extraAddr = ''; // 조합형 주소 변수
+
+                        // 사용자가 선택한 주소 타입에 따라 해당 주소 값을 가져온다.
+                        if (data.userSelectedType === 'R') { // 사용자가 도로명 주소를 선택했을 경우
+                            fullAddr = data.roadAddress;
+
+                        } else { // 사용자가 지번 주소를 선택했을 경우(J)
+                            fullAddr = data.jibunAddress;
+                        }
+
+                        // 사용자가 선택한 주소가 도로명 타입일때 조합한다.
+                        if (data.userSelectedType === 'R') {
+                            //법정동명이 있을 경우 추가한다.
+                            if (data.bname !== '') {
+                                extraAddr += data.bname;
+                            }
+                            // 건물명이 있을 경우 추가한다.
+                            if (data.buildingName !== '') {
+                                extraAddr += (extraAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+                            }
+                            // 조합형주소의 유무에 따라 양쪽에 괄호를 추가하여 최종 주소를 만든다.
+                            fullAddr += (extraAddr !== '' ? ' (' + extraAddr + ')' : '');
+                        }
+
+                        // 우편번호와 주소 정보를 해당 필드에 넣는다.
+                        document.getElementById('postcode').value = data.zonecode; //5자리 새우편번호 사용
+                        document.getElementById('address').value = fullAddr;
+
+                        // 커서를 상세주소 필드로 이동한다.
+                        document.getElementById('address2').focus();
+                    }
+                }).open({
+                    popupName: 'popPostCode' //팝업 이름을 설정(영문,한글,숫자 모두 가능, 영문 추천)
+                });
+            },
+            isNoAlphaNum: function (input) {
+                return !UTILITY.isAlphabet(input) || !UTILITY.isNumber(input);
+            },
+            isAlphabet: function (input) {
+                var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+                return UTILITY.containsChars(input, chars);
+            },
+            isUpperAlphabet: function (input) {
+                var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                return UTILITY.containsChars(input, chars);
+            },
+            isLowerAlphabet: function (input) {
+                var chars = "abcdefghijklmnopqrstuvwxyz";
+                return UTILITY.containsChars(input, chars);
+            },
+            isNumber: function (input) {
+                var chars = "0123456789";
+                return UTILITY.containsChars(input, chars);
+            },
+            isAlphaNumCheck: function (str) {
+                var emailfilter = /^[A-Za-z0-9]{4,50}$/i; // 모든 알파벳과 숫자
+                return (emailfilter.test(str));
+            },
+            isSpecialCharacter: function (input) {
+                var chars = "-_=+\|()*&^%$#@!~`?></;,.:'";
+                return UTILITY.containsChars(input, chars);
+            },
+            isCombine: function (input) {
+                var combination_Count = 0;
+                //if (UTILITY.isUpperAlphabet(input)) { combination_Count++ };
+                //if (UTILITY.isLowerAlphabet(input)) { combination_Count++ };
+                if (UTILITY.isAlphabet(input)) { combination_Count++ };
+                if (UTILITY.isNumber(input)) { combination_Count++ };
+                if (UTILITY.isSpecialCharacter(input)) { combination_Count++ };
+                return combination_Count;
+            },
+            containsChars: function (input, chars) {
+                for (var inx = 0; inx < input.length; inx++) 
+                {
+                    if (chars.indexOf(input.charAt(inx)) !== -1)
+                        return true;
+                }
+                return false;
+            },
+            checkStrLen: function (maxlen, obj) {
+                var temp; //들어오는 문자값...
+                var msglen;
+                msglen = maxlen * 2;
+                var value = obj.value;
+
+                l = obj.value.length;
+                tmpstr = "";
+
+                if (l === 0) {
+                    value = maxlen * 2;
+                }
+                else {
+                    for (k = 0; k < l; k++) {
+                        temp = value.charAt(k);
+
+                        if (escape(temp).length > 4)
+                            msglen -= 2;
+                        else
+                            msglen--;
+
+                        if (msglen < 0) {
+                            alert("총 영문 " + (maxlen * 2) + "자 한글 " + maxlen + "자 까지 보내실수 있습니다.");
+                            obj.value = tmpstr;
+                            break;
+                        }
+                        else {
+                            tmpstr += temp;
+                        }
+                    }
+                }
+            },
+            isValidPhoneNo: function (pno) {
+                var regExp = /^(01[016789]{1}|02|0[3-9]{1}[0-9]{1})-?[0-9]{3,4}-?[0-9]{4}$/;
+                return regExp.test(pno);
+            },
+            isDuplicate: function (str, limit) {
+
+                if (limit < 2)
+                    return false;
+
+                limit = limit - 1;
+                var cnt = 0;
+                var strch = '';
+
+                for (var i = 0; i < str.length; i++) {
+                    if (strch === str.charAt(i)) {
+                        cnt++;
+                        if (cnt > limit) {
+                            break;
+                        }
+                    }
+                    else {
+                        strch = str.charAt(i);
+                        cnt = 1;
+                    }
+                }
+
+                return cnt > limit
+            },
+            isEmailCheck: function (str) {
+                var emailfilter = /@/;
+                return (emailfilter.test(str));
+            },
+            isEmail: function (str) {
+                var emailfilter = /^((?:(?:(?:[a-zA-Z0-9_][\.\-\+_]*)*)[a-zA-Z0-9_\-])+)\@((?:(?:(?:[a-zA-Z0-9][\.\-_]?){0,62})[a-zA-Z0-9])+)\.([a-zA-Z0-9]{2,6})$/i;
+                if (str === "")
+                    return false;
+                else if (!emailfilter.test(str))
+                    return false;
+
+                return true;
+            },
+            copyShortUrl: function (url) {
+                if (UTILITY.isIE()) {
+                    window.clipboardData.setData('Text', url);
+                    alert('주소가 복사되었습니다. Ctrl+V로 붙여 넣기 하세요.');
+                } else {
+                    temp = prompt("이 글의 트랙백 주소입니다. Ctrl+C를 눌러 클립보드로 복사하세요", url);
+                }
+            },
+            isIE: function () { return ((navigator.appName === 'Microsoft Internet Explorer') || ((navigator.appName === 'Netscape') && (new RegExp("Trident/.*rv:([0-9]{1,}[\.0-9]{0,})").exec(navigator.userAgent) !== null))); },
+            getJustText: function ($obj) {
+                $obj.contents().filter(function () {
+                    return this.nodeType === 3;
+                }).text();
+            },
+            countdown: function (selector, callback, second) {
+                var $target = $(selector);
+                $target.html(second);
+
+                var timer = setInterval(function () {
+                    $target.html(second);
+                    second -= 1;
+                    if (second < 0) {
+                        clearInterval(timer);
+                        callback();
+                    }
+                }, 1000);
+            },
+            generateSearchParameter: function (descriptor) {
+                var parameter = '';
+                if (descriptor.t) parameter += ('&t=' + descriptor.t);  //title
+                if (descriptor.n) parameter += ('&n=' + descriptor.n);  //writer
+                if (descriptor.h) parameter += ('&h=' + descriptor.h);  //hashtag
+                if (descriptor.c) parameter += ('&c=' + descriptor.c);
+                if (descriptor.sc) parameter += ('&sc=' + descriptor.sc);
+                if (descriptor.c2) parameter += ('&c2=' + descriptor.c2);
+                if (descriptor.co) parameter += ('&co=' + descriptor.co);
+                if (descriptor.ob) parameter += ('&ob=' + descriptor.ob);
+                if (descriptor.pd) parameter += ('&pd=' + descriptor.pd);
+                if (parameter !== '') parameter = parameter.substring(1);
+
+                return encodeURIComponent(parameter);
+            },
+            fetchUnixTimeStamp: function () {
+                return Math.floor(new Date().getTime() / 1000);
+            },
+            replaceAllCaseInsensitive: function(src, searchMask, replaceMask) {
+                var regEx = new RegExp(searchMask, "ig");
+                return src.replace(regEx, replaceMask);
+            },
+            checkSpace: function (str) {
+                return (str.search(/\s/) !== -1);
+            },
+            setCookie: function (name, value, expiredays) {
+                var todayDate = new Date();
+                todayDate.setDate(todayDate.getDate() + expiredays);
+                document.cookie = name + '=' + escape(value) + '; path=/; expires=' + todayDate.toGMTString() + ';';
+            },
+            setCookieDomain: function (name, value, expiredays) {
+                var todayDate = new Date();
+                todayDate.setDate(todayDate.getDate() + expiredays);
+                document.cookie = name + '=' + escape(value) + '; path=/; expires=' + todayDate.toGMTString() + '; domain=.' + COMMON.domain + ';';
+            },
+            getCookie: function (name) {
+                var nameOfCookie = name + "=";
+                var x = 0;
+                while (x <= document.cookie.length) {
+                    var y = (x + nameOfCookie.length);
+                    if (document.cookie.substring(x, y) == nameOfCookie) {
+                        if ((endOfCookie = document.cookie.indexOf(";", y)) == -1)
+                            endOfCookie = document.cookie.length;
+                        return unescape(document.cookie.substring(y, endOfCookie));
+                    }
+                    x = document.cookie.indexOf(" ", x) + 1;
+                    if (x == 0)
+                        break;
+                }
+                return "";
+            },
+            sns: function (service, title, url) {
+
+                var agent = navigator.userAgent.toLowerCase();
+                if ((navigator.appName == 'Netscape' && navigator.userAgent.search('Trident') != -1) || (agent.indexOf("msie") != -1)) { // IE 체크
+                    alert('페이스북 및 트위터 서비스가 Internet Explorer 브라우저에서 중단되었습니다.');
+                    return;
+                }
+
+                var popupWidth = 1024;
+                var popupHeight = 800;
+                var SNSURL = "";
+                var popupScroll = "yes";
+
+                switch (service) {
+                    case "facebook":
+                        SNSURL = "http://www.facebook.com/sharer.php?t=" + encodeURIComponent(title) + "&u=" + encodeURIComponent(url);
+                        popupWidth = 800;
+                        popupHeight = 400;
+                        break;
+
+                    case "twitter":
+                        //SNSURL = "http://twitter.com/home?status=" + encodeURIComponent(title + ' ') + escape(url);
+                        SNSURL = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(title) + "&url=" + encodeURIComponent(url);
+                        popupWidth = 800;
+                        popupHeight = 425;
+                        break;
+                }
+                window.open(SNSURL, service, 'width=' + popupWidth + ', height=' + popupHeight + ',resizable=yes,scrollbars=' + popupScroll);
+            },
+            goHome: function () {
+                UTILITY.setCookieDomain('introskip', '1');
+                window.location.href = '/Home/Main';
+            },
+            dayOff: function () {
+                UTILITY.setCookieDomain('introdayoff', '1', 1);
+                window.location.href = '/Home/Main';
+            },
+            getInputCursorPosition: function ($element) {
+                var position = 0,
+                    selection;
+
+                if (document.selection) {
+                    // IE Support
+                    $element.focus();
+                    selection = document.selection.createRange();
+                    selection.moveStart('character', -$element.value.length);
+                    position = selection.text.length;
+                } else if ($element.selectionStart || $element.selectionStart === 0) {
+                    position = $element.selectionStart;
+                }
+
+                return position;
+            },
+            setInputCursorPosition: function ($element, position) {
+                var selection;
+
+                if (document.selection) {
+                    // IE Support
+                    $element.focus();
+                    selection = document.selection.createRange();
+                    selection.moveStart('character', -$element.value.length);
+                    selection.moveStart('character', position);
+                    selection.moveEnd('character', 0);
+                    selection.select();
+                } else if ($element.selectionStart || $element.selectionStart === 0) {
+                    $element.selectionStart = position;
+                    $element.selectionEnd = position;
+                    $element.focus();
+                }
+            },
+            consoleLog: function (message) {
+                var console = window.console || { log: function () { } };
+                console.log(message);
+            }
+        };
+    }
+
+    if (!instance) instance = initiate();
+    return instance;
+}());
+
+var RANKING = (function () {
+    var instance;
+
+    function initiate() {
+        return {
+            sortByWorld: function (condition, world) {
+                if (world < 0 || world > 255) {
+                    return;
+                }
+                //window.location.href = RANKING.getOrigin() + '?w=' + world;
+                condition.w = world;
+                window.location.href = RANKING.getOrigin(condition.k) + RANKING.getSearchQuery(condition);
+            },
+            searchByCharacter: function (condition, character, world) {
+                if (condition.c === '') { //현 페이지 로드시 검색어가 없고 신규 검색 시 체크
+                    if (character === '') {
+                        alert('검색어를 입력하세요.');
+                        return;
+                    }
+                    if (character.length < 2) {
+                        alert('검색어는 2자 이상을 입력해야 합니다.');
+                        return;
+                    }
+                }
+                
+                condition.c = character;
+                condition.w = world;
+                window.location.href = RANKING.getOrigin(condition.k) + RANKING.getSearchQuery(condition);
+            },
+            sortByJob: function (condition, job, jobDetail) {
+                if (job < 0 || job > 255) {
+                    return;
+                }
+                condition.page = 1; //페이지는 리셋
+                condition.c = '';   //캐릭터 리셋
+                condition.j = job;
+                condition.d = jobDetail;
+                window.location.href = RANKING.getOrigin(condition.k) + RANKING.getSearchQuery(condition);
+            },
+            searchByGuild: function (condition, guild) {
+                if (guild === '') {
+                    alert('검색어를 입력하세요.');
+                    return;
+                }
+                if (guild.length < 2) {
+                    alert('검색어는 2자 이상을 입력해야 합니다.');
+                    return;
+                }
+                window.location.href = RANKING.getOrigin() + RANKING.getSearchQuery({ t: condition.t }) + '&n=' + encodeURI(guild);
+            },
+            sortByWeek: function (condition, week) {
+                //월드값만 남기고 조건 리셋
+                window.location.href = RANKING.getOrigin(week) + RANKING.getSearchQuery({ w: condition.w, k: week });
+            },
+            sortByType: function (condition, type) {
+                //월드 + week 값만 남기고 조건 리셋
+                window.location.href = RANKING.getOrigin(condition.k) + RANKING.getSearchQuery({ w: condition.w, k: condition.k, t: type });
+            },
+            sortByGuildType: function (condition, type) {
+                //월드 + 항목 값
+                window.location.href = RANKING.getOrigin() + RANKING.getSearchQuery({ w: condition.w, t: type });
+            },
+            sortByArenaSeasonType: function (condition, type) {
+                //월드 + 항목 값
+                window.location.href = RANKING.getOrigin() + RANKING.getSearchQuery({ w: condition.w, t: type });
+            },
+            sortByAchievementGrade: function (condition) {
+                var grade = $('.rank_search_wrap select[name=achievementGrade]').val();
+                
+                window.location.href = RANKING.getOrigin() + '?g=' + grade;
+            },
+            getSearchQuery: function (condition) {
+                var search = {};
+                if (condition.c && condition.c !== '') {
+                    //캐릭터 검색시에는 도장타입과 week값만 유지됨
+                    search.c = condition.c;
+                    if (condition.t && condition.t > 0 && condition.t < 255) search.t = condition.t;
+                    //if (condition.k && condition.k !== '') search.k = condition.k;
+                    if (condition.w && condition.w < 255) search.w = condition.w;
+                }
+                else {
+                    if (condition.page && condition.page > 1) search.page = condition.page;
+                    //초보자 직업인 경우 condition.j 값이 0로 falsy value 로 취급됨
+                    if (condition.j >= 0 && condition.j < 255) search.j = condition.j;
+                    if (condition.d && condition.d >= 0 && condition.d < 255) search.d = condition.d;
+                    if (condition.w && condition.w >= 0 && condition.w < 255) search.w = condition.w;
+                    //if (condition.t && condition.t > 0 && condition.t < 255) search.t = condition.t;
+                    if (condition.t >= 0 && condition.t < 255) search.t = condition.t; // 길드 항목타입에 "0" 포함
+                    if (condition.n && condition.n !== '') search.n = condition.n;
+                    if (condition.g && condition.g > 0 && condition.g < 255) search.g = condition.g;
+                    //if (condition.k && condition.k !== '') search.k = condition.k;
+                }
+
+                var query = $.param(search);
+                return (query === '') ? '' : '?' + query;
+            },
+            getOrigin: function (week) {
+                var path = window.location.pathname;
+                if (!window.location.origin) {
+                    window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port : '');
+                }
+                if (week && week.toLowerCase() === 'lastweek') {
+                    path = UTILITY.replaceAllCaseInsensitive(path, '/thisweek', '');
+                    path = UTILITY.replaceAllCaseInsensitive(path, '/lastweek', '');
+                    return window.location.origin + path + '/LastWeek';
+                }
+                else if (week && week.toLowerCase() === 'thisweek') {
+                    path = UTILITY.replaceAllCaseInsensitive(path, '/thisweek', '');
+                    path = UTILITY.replaceAllCaseInsensitive(path, '/lastweek', '');
+                    return window.location.origin + path + '/ThisWeek';
+                }   
+                else
+                    return window.location.origin + window.location.pathname;
+            },
+            linkByWorld: function (condition, world, path) {
+                if (world < 0 || world > 255) {
+                    return;
+                }
+                //월드 변경시에는 다른검색조건 리셋
+                if (!window.location.origin) {
+                    window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port : '');
+                }
+                window.location.href = window.location.origin + path + '?w=' + world;
+            }
+        };
+    }
+
+    function removeWeek(url, searchMask) {
+        var regEx = new RegExp(searchMask, "ig");
+        var replaceMask = "as";
+
+        return url.replace(regEx, replaceMask);
+    }
+
+    if (!instance) instance = initiate();
+    return instance;
+}());
+
+var MYMAPLE = (function () {
+    var instance;
+
+    function initiate() {
+        return {
+            showErrorTextBySelector: function (selector, position, message) {
+                $(selector).hide();
+                if (message !== '') {
+                    var $panel = $(selector).eq(position);
+                    $panel.text(message);
+                    $panel.show();
+                    alert(message);
+                }
+            },
+            showErrorText: function (position, message) {
+                MYMAPLE.showErrorTextBySelector('.erro_txt', position, message);
+            }
+        };
+    }
+
+    if (!instance) instance = initiate();
+    return instance;
+}());
